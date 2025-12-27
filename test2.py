@@ -1,0 +1,90 @@
+import time
+import spidev
+from gpiozero import DigitalOutputDevice
+
+# ===== GPIO =====
+DC  = DigitalOutputDevice(22)
+RST = DigitalOutputDevice(17)
+
+# ===== SPI =====
+spi = spidev.SpiDev()
+spi.open(0, 1)                 # SPI0, CE1
+spi.max_speed_hz = 1_000_000   # VERY SAFE
+spi.mode = 0
+
+def cmd(c):
+    DC.off()
+    spi.writebytes([c])
+
+def data(d):
+    DC.on()
+    spi.writebytes(d)
+
+def reset():
+    RST.off()
+    time.sleep(0.15)
+    RST.on()
+    time.sleep(0.15)
+
+# ===== INIT SEQUENCE (IMPORTANT) =====
+reset()
+
+cmd(0xF0)
+data([0xC3])
+cmd(0xF0)
+data([0x96])
+
+cmd(0x36)
+data([0x48])     # Memory Access Control
+
+cmd(0x3A)
+data([0x55])     # RGB565
+
+cmd(0xB4)
+data([0x01])
+
+cmd(0xB7)
+data([0xC6])
+
+cmd(0xC0)
+data([0x80, 0x45])
+
+cmd(0xC1)
+data([0x13])
+
+cmd(0xC2)
+data([0xA7])
+
+cmd(0xC5)
+data([0x0A])
+
+cmd(0xE8)
+data([0x40, 0x8A, 0x00, 0x00, 0x29, 0x19, 0xA5, 0x33])
+
+cmd(0xE0)
+data([0xF0,0x09,0x0B,0x06,0x04,0x15,0x2F,0x54,0x42,0x3C,0x17,0x14,0x18,0x1B])
+
+cmd(0xE1)
+data([0xE0,0x09,0x0B,0x06,0x04,0x03,0x2B,0x43,0x42,0x3B,0x16,0x14,0x17,0x1B])
+
+cmd(0x11)        # Sleep OUT
+time.sleep(0.15)
+
+cmd(0x29)        # Display ON
+time.sleep(0.15)
+
+# ===== SET FULL WINDOW =====
+cmd(0x2A)
+data([0x00, 0x00, 0x01, 0x3F])   # X: 0–319
+
+cmd(0x2B)
+data([0x00, 0x00, 0x01, 0xDF])   # Y: 0–479
+
+cmd(0x2C)
+
+# ===== FILL BLUE =====
+DC.on()
+for _ in range(320 * 480):
+    spi.writebytes([0x00, 0x1F])  # BLUE
+
+print("ST7796S should now show BLUE screen")
